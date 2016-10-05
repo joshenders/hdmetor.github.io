@@ -39,9 +39,12 @@ from functools import lru_cache
 thread = 12627852
 
 def clean_text(data):
-    clean_text = BeautifulSoup(data['text'], "html.parser").text
-    data['text'] = clean_text
-    return data
+    try:
+        clean_text = BeautifulSoup(data['text'], "html.parser").text
+        data['text'] = clean_text
+        return data
+    except KeyError:
+          return {}
 
 @lru_cache(maxsize=100)
 def fetch_hn_data(thread):
@@ -57,6 +60,7 @@ data = fetch_hn_data(thread)
 Note: for now we have hard-coded the thread number, but we are keeping it as a separate variable so that it can be later passed as a commend line argument.
 
 The `text` value from the API response is still valid html code, which means there is a lot of unnecessary noise. We are using BeautifulSoup to get rid of it, and have a cleaner version of the text. We seem to lose paragraph / new line dividers but this doesn't seem to be a problem for now.
+The `text` field is not always present. For example the post might be deleted. If that's the case, we return an empty `dict`, for reasons that will be clearer in a moment.
 
 In order to be able to search for the right posting (therefore job) we are going to feed all such posts to Elasticsearch](https://www.elastic.co/), a fully fledged text search engine.
 All the filtering and querying will happen from via the python Elasticsearch package.
@@ -112,4 +116,57 @@ If everything worked properly, then the index will contain all the new posting s
 
 # Querying the index
 
+Let's make a sanity check, to make sure we are not off track. Let's search for San Francisco jobs. I'm not sure how many we should find, but more than 10 for sure
 
+{% highlight python %}
+query = {
+    "query" : {
+        "bool" : {
+            "must" : {
+                "match": { 'text' : 'san francisco'}
+            }
+        }
+    }}
+
+response = es.search(index='hn', body=query)
+response['hits']['total']
+>>> 180
+{% endhighlight %}
+
+And it worked! This seems more than a reasonable result. Note that your mileage may vary, because posts get deleted all / added the time.
+
+So this matches _any_ job with a location in San Francisco. What if we want a San Francisco based job, that contains the 'machine learning' keyword?
+
+We just need to add another clause to the `match` query:
+
+{% highlight python %}
+query = {"query" : {
+        "bool" : {
+            "must" : [{
+                "match": {'text' : 'san francisco'}},
+                {"match": {'text' : 'machine learning'}}
+            ]
+
+        }
+
+    }}
+
+es.search(index='hn', body=query)['hits']['total']
+>>> 40
+{% endhighlight %}
+
+That's great! Now we can go one and read such posts one by one, and see if we find them interesting.
+
+# What's next?
+
+While this simple method works, it is still too manual to be really useful. Foe example the query above is way too restrictive. In general we want something like ('san franisco' OR 'bay area') AND ('machine learning' OR 'data analysis'). Those elasticsearch json based queries can be really nested and it's easy to get lost in them.
+
+ In the next posts we are going to address the following issues:
+
+- easily combining elasticsearch queries
+
+- updating the index (without reindexing everything from scratch every time)
+
+- being notified (via email, slack or similar) when an new post become available
+
+The full code for this can be found [here](https://github.com/hdmetor/HNCrawler)
