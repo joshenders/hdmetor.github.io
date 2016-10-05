@@ -1,0 +1,96 @@
+ # How I found a job in San Francisco by crawling Hacker News
+
+Recently I have decided to move to San Francisco, and I had only one problem: finding a job.
+I knew two things:
+
+- I didn't want to apply to one of the big four
+
+- I wanted a Machine Learning job
+
+After doing some obvious Google searches, I decided to find a better way, especially considering that anonymous online applicants are rarely considered. (to my surprise, I landed an onsite interview with a company I applied online.)
+
+What I wanted was a list of companies offering machine learning positions, and possibly a smoother application process.
+
+I decided to use the monthly Hacker News [who's hiring](https://www.google.com/search?q=hacker+news+who%27s+hiring) to help me with the search.
+
+At the time of writing, the last of such thread is located [here](https://news.ycombinator.com/item?id=12627852).
+
+Since this thread is now very popular, there are way too many postings there, so I needed to filter our the uninteresting ones. What I wanted to _keep_ was
+
+- a top level thread. This is where usually jobs are posted. Replies are mostly used to ask for additional info.
+
+- a job located in SF or in the Bay Area
+
+- a job related to my area of interest
+
+Furthermore, some jobs are added in during the course of the month, so I needed a way of keeping track of what was already scraped and what was new.
+
+Finally I wanted an easy way to read trough the jobs, so that I could pick the ones were interesting to me, and move from there.
+
+# First of all: the data
+
+Of course the first thing we need is to get the data from the thread. Hacker News conveniently offers an [API](https://github.com/HackerNews/API), that gives all the first level posts (called `kids` in the response) of a given story. This is exactly what we need.
+
+{% highlight python %}
+import requests
+
+thread = 12627852
+def url(thread):
+    return "https://hacker-news.firebaseio.com/v0/item/{}.json".format(thread)
+
+def json_data(thread):
+    r = requests.get(url(thread), headers={'User-Agent': 'Mozilla/5.0'})
+    assert r.status_code == 200
+    return r.json()
+
+data = json_data(thread)
+{% endhighlight %}
+
+Note: for now we have hard-coded the thread number, but we are keeping it as a separate variable so that it can be later passed as a commend line argument.
+
+# Filter the posting
+
+We need now to filter the interesting threads:
+
+{% highlight python %}
+
+kids = data['kids']
+
+results = []
+for kid in kids:
+    data = json_data(kid)
+    # the post might be deleted
+    if data.get('dead', False):
+        continue
+    text = data['text']
+    # we will define this filter soon
+    if cool_job(text):
+        results.append(kid)
+
+{% endhighlight %}
+
+Note that we are using `.get` to fetch the `dead` key, using `False` as default argument. We need to do this way because the `dead` key is not required in the response.
+
+The same can be written in the compact form:
+
+{% highlight python %}
+
+kids = data['kids']
+
+results = [kid for kid in kids if not json_data(kid).get('dead', False) and cool_job(json_data(kid)['text'])]
+
+{% endhighlight %}
+
+Now we need to decide what condition we want to pose on the posting text, i.e. we need to define `cool_job`:
+
+
+{% highlight python %}
+
+kids = data['kids']
+
+results = [kid for kid in kids if not json_data(kid).get('dead', False) and cool_job(json_data(kid)['text'])]
+
+{% endhighlight %}
+
+
+## NOte: don;t return a the id only, maybe return a json?
