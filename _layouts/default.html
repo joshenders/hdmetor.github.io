@@ -24,5 +24,8 @@
                     <li><a href="https://github.com/hdmetor">github.com/hdmetor</a></li>
                 </ul>
             </footer>
+        {% if jekyll.environment == 'production' %}
+        % include analytics.html %}
+        {% endif %}
         </body>
     </html>

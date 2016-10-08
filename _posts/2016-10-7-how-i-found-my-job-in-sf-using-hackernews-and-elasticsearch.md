@@ -66,7 +66,7 @@ Note: for now we have hard-coded the thread number, but we are keeping it as a s
 The `text` value from the API response is still valid html code, which means there is a lot of unnecessary noise. We are using BeautifulSoup to get rid of it, and have a cleaner version of the text. We seem to lose paragraph / new line dividers but this doesn't seem to be a problem for now.
 The `text` field is not always present. For example the post might be deleted. If that's the case, we return an empty `dict`, for reasons that will be clearer in a moment.
 
-In order to be able to search for the right posting (therefore job) we are going to feed all such posts to Elasticsearch](https://www.elastic.co/), a fully fledged text search engine.
+In order to be able to search for the right posting (therefore job) we are going to feed all such posts to [Elasticsearch](https://www.elastic.co/), a fully fledged text search engine.
 All the filtering and querying will happen from via the python Elasticsearch package.
 
 
