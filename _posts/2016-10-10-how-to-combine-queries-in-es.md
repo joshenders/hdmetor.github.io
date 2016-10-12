@@ -1,7 +1,7 @@
 ---
 layout: post
 title: How to combine boolean queries in Elasticsearch
-description: "How to combine elasticsearch queries."
+description: 'How to combine elasticsearch queries.'
 modified: 2016-10-10
 tags: [python, elasticsearch, boolean queries]
 image:
@@ -12,7 +12,7 @@ image:
 
 In a [previous post]({% post_url 2016-10-07-how-i-found-my-job-in-sf-using-hackernews-and-elasticsearch %}) we saw how to use Elasticsearch to search for our dream job among the ones posted on hacker news.
 
-Since Elasticsearch queries are basically JSON it"s really easy to lose track when we start nesting.
+Since Elasticsearch queries are basically JSON it's really easy to lose track when we start nesting.
 
 In this post we are going to define a Python class that will create the required query (read: JSON) on demand.
 
@@ -22,11 +22,11 @@ A query in Elasticsearch in its general form is:
 
 {% highlight python %}
 {
-   "query" : {
-        "bool" : {
-            "must" : [ ... ]
-            "should" : [ ... ]
-            "must_not" : [ ... ]
+   'query' : {
+        'bool' : {
+            'must' : [ ... ]
+            'should' : [ ... ]
+            'must_not' : [ ... ]
         }
     }
 }
@@ -35,15 +35,15 @@ A query in Elasticsearch in its general form is:
 
 Where `must`, `should` and `must_not` correspond to the `AND`, `OR` and `NOT` operators respectively.
 
-To use an [earlier example]({% post_url 2016-10-07-how-i-found-my-job-in-sf-using-hackernews-and-elasticsearch %}), the following query will require both "san francisco" and "machine learning" to be present in the `text` field.
+To use an [earlier example]({% post_url 2016-10-07-how-i-found-my-job-in-sf-using-hackernews-and-elasticsearch %}), the following query will require both 'san francisco' and 'machine learning' to be present in the `text` field.
 
 {% highlight python %}
 {
-    "query" : {
-        "bool" : {
-            "must" : [
-                {"match": {"text" : "san francisco"}},
-                {"match": {"text" : "machine learning"}}
+    'query' : {
+        'bool' : {
+            'must' : [
+                {'match': {'text' : 'san francisco'}},
+                {'match': {'text' : 'machine learning'}}
             ]
         }
     }
@@ -54,25 +54,25 @@ So far so good. But what if we want to nest a boolean query inside another boole
 
 ![Deeper]({{site.url}}/assets/2016/deeper.jpg)
 
-For example, what if we want to find something that matches ("san franisco" OR "bay area") AND ("machine learning" OR "data analysis")?
+For example, what if we want to find something that matches ('san franisco' OR 'bay area') AND ('machine learning' OR 'data analysis')?
 
 The resulting query will be something like this:
 
 {% highlight python %}
 {
-    "query" : {
-        "bool" : {
-            "must" : [
-                "bool" : {
-                    "should" : [
-                        {"match": {"text" : "san francisco"}},
-                        {"match": {"text" : "bay area"}}
+    'query' : {
+        'bool' : {
+            'must' : [
+                'bool' : {
+                    'should' : [
+                        {'match': {'text' : 'san francisco'}},
+                        {'match': {'text' : 'bay area'}}
                     ]
                 },
-                "bool" : {
-                    "should" : [
-                        {"match": {"text" : "machine learning"}},
-                        {"match": {"text" : "data analysis"}}
+                'bool' : {
+                    'should' : [
+                        {'match': {'text' : 'machine learning'}},
+                        {'match': {'text' : 'data analysis'}}
                     ]
                 }
             ]
@@ -81,7 +81,7 @@ The resulting query will be something like this:
 }
 {% endhighlight %}
 
-You can see how it"s easy to get lost here.
+You can see how it's easy to get lost here.
 
 # Python to the rescue!
 
@@ -97,27 +97,27 @@ Before start coding, let's design the class. This will save so much time afterwa
 
 - each term can be another query
 
-Let"s write down some obvious use cases.
+Let's write down some obvious use cases.
 
 {% highlight python %}
 # easy case: one field, one term per field
-query = Query(must={"text" : "san francisco"}, should_not={"text" : "new york"})
+query = Query(must={'text' : 'san francisco'}, should_not={'text' : 'new york'})
 
 # one field, more terms
-query_2 = Query(should={"text" : ["san francisco", "bay area"]})
+query_2 = Query(should={'text' : ['san francisco', 'bay area']})
 
 # multiple fields, multiple terms
-query_3 = Query(must={"text" : ["san francisco", "bay area"], "title" : "hiring"})
+query_3 = Query(must={'text' : ['san francisco', 'bay area'], 'title' : 'hiring'})
 
 # query in a query
 inner = query_2
-query_outer = Query(must={"query" : inner, "title" : "hiring"})
+query_outer = Query(must={'query' : inner, 'title' : 'hiring'})
 
 {% endhighlight %}
 
 Most important of all, our class needs to have a `to_elasticsearch` method to produce the desired json on demand.
 
-Let"s start coding something that would work for the first query, and then let"s improve on that:
+Let's start coding something that would work for the first query, and then let's improve on that:
 
 {% highlight python %}
 class Query:
@@ -133,10 +133,10 @@ In order to build the ES query, we then need to figure out which arguments have 
 
 {% highlight python %}
     def to_elasticsearch(self):
-        query = {name : value for name, value in zip(["must", "should", "should_not"], [self.must, self.should, self.should_not]) if value}
+        query = {name : value for name, value in zip(['must', 'should', 'should_not'], [self.must, self.should, self.should_not]) if value}
         query =  {
-            "query" : {
-                "bool" : query
+            'query' : {
+                'bool' : query
             }
         }
 
@@ -144,21 +144,21 @@ In order to build the ES query, we then need to figure out which arguments have 
 {% endhighlight %}
 
 So far so good. But what if the the same field has multiple values, as in `query_2`?
-Our function needs to adapt. For one, we need to use the same key for all the values. So in the example above the key `text` has to be applied to both `"san francisco"` and `"bay area"`.
+Our function needs to adapt. For one, we need to use the same key for all the values. So in the example above the key `text` has to be applied to both `'san francisco'` and `'bay area'`.
 
 {% highlight python %}
     def to_elasticsearch(self):
     query = {}
-        for name, values in zip(["must", "should", "should_not"], [self.must, self.should, self.should_not]):
+        for name, values in zip(['must', 'should', 'should_not'], [self.must, self.should, self.should_not]):
             if not values:
                 continue
             for field_name, field_values in values.items():
-            # field_name = "text", field_values = ["san francisco", "bay area"]
-                query[name] = [{"match" : {field_name : v}} for v in field_values]
+            # field_name = 'text', field_values = ['san francisco', 'bay area']
+                query[name] = [{'match' : {field_name : v}} for v in field_values]
 
             query =  {
-                "query" : {
-                    "bool" : query
+                'query' : {
+                    'bool' : query
                 }
             }
         return query
@@ -168,7 +168,7 @@ Our function needs to adapt. For one, we need to use the same key for all the va
 Now we got it working for lists. What happens if we try mixed case like
 
 {% highlight python %}
-query_3 = Query(must={"text" : ["san francisco", "bay area"], "title" : hiring})
+query_3 = Query(must={'text' : ['san francisco', 'bay area'], 'title' : hiring})
 {% endhighlight %}
 
 There are 2 things that will break:
@@ -184,16 +184,16 @@ To fix the first problem, we can just make `query` a `defaultdict` and `extend` 
 
     def to_elasticsearch(self):
     query = defaultdict(list)
-        for name, values in zip(["must", "should", "should_not"], [self.must, self.should, self.should_not]):
+        for name, values in zip(['must', 'should', 'should_not'], [self.must, self.should, self.should_not]):
             if not values:
                 continue
             for field_name, field_values in values.items():
-            # field_name = "text", field_values = ["san francisco", "bay area"]
-                query[name].extend([{"match" : {field_name : v}} for v in field_values])
+            # field_name = 'text', field_values = ['san francisco', 'bay area']
+                query[name].extend([{'match' : {field_name : v}} for v in field_values])
 
             query =  {
-                "query" : {
-                    "bool" : query
+                'query' : {
+                    'bool' : query
                 }
             }
         return query
@@ -228,14 +228,14 @@ Some stuff to note here:
 
 - `[value]` is not the same as `list(value)`
 
-- `query_1` output is now changed (there is an extra list), but it"s still a valid ES query, and it returns the same result.
+- `query_1` output is now changed (there is an extra list), but it's still a valid ES query, and it returns the same result.
 
 
-# It"s turtles all the way down
+# It's turtles all the way down
 
 Now the interesting part: we want to combine a [query withing a query](http://theinceptionbutton.com/).
 
-Let"s do this step by step. First of all, we want the method `to_elasticsearch` to expand any inner queries. This is done by calling the same method on the inner queries. We will need to distinguish between a real `Query` object and just a query term.
+Let's do this step by step. First of all, we want the method `to_elasticsearch` to expand any inner queries. This is done by calling the same method on the inner queries. We will need to distinguish between a real `Query` object and just a query term.
 
 The minimal edit seems to be something like this:
 
@@ -244,39 +244,39 @@ The minimal edit seems to be something like this:
 
     def to_elasticsearch(self):
     query = defaultdict(list)
-        for name, values in zip(["must", "should", "should_not"], [self.must, self.should, self.should_not]):
+        for name, values in zip(['must', 'should', 'should_not'], [self.must, self.should, self.should_not]):
             if not values:
                 continue
             for field_name, field_values in values.items():
-            # field_name = "text", field_values = ["san francisco", "bay area"]
-                query[name].extend([v.to_elasticsearch() if isinstance(v, Query) else {"match" : {field_name : v}} for v in field_values])
+            # field_name = 'text', field_values = ['san francisco', 'bay area']
+                query[name].extend([v.to_elasticsearch() if isinstance(v, Query) else {'match' : {field_name : v}} for v in field_values])
 
             query =  {
-                "query" : {
-                    "bool" : query
+                'query' : {
+                    'bool' : query
                 }
             }
         return query
 {% endhighlight %}
 
-Just to reiterate: everything is the same, except we now check if we encounter another instance of `Query`. If that"s the case, the instance itself will take care of transforming its portion into an Elasticsearch query, unless there is another `Query` instance inside...
+Just to reiterate: everything is the same, except we now check if we encounter another instance of `Query`. If that's the case, the instance itself will take care of transforming its portion into an Elasticsearch query, unless there is another `Query` instance inside...
 
 Unfortunately this does not work as expected:
 
 {% highlight python %}
-inner = Query(must={"text" : ["san francisco", "bay area"]})
-query_outer = Query(should={"query" : inner, "title" : "hiring"})
+inner = Query(must={'text' : ['san francisco', 'bay area']})
+query_outer = Query(should={'query' : inner, 'title' : 'hiring'})
 query_outer.to_elasticsearch()
 >>> {
-        "query": {
-            "bool": {
-                "should": [
-                    {"match": {"title": "hiring"}},
-                    { "query": {
-                        "bool": {
-                            "must": [
-                                {"match": {"text": "san francisco"}},
-                                {"match": {"text": "bay area"}}
+        'query': {
+            'bool': {
+                'should': [
+                    {'match': {'title': 'hiring'}},
+                    { 'query': {
+                        'bool': {
+                            'must': [
+                                {'match': {'text': 'san francisco'}},
+                                {'match': {'text': 'bay area'}}
                             ]
                         }
                     }
@@ -294,37 +294,37 @@ Can you spot the mistake? The key `query` appears twice, so the previous is not 
 
         query = defaultdict(list)
 
-        for name, values in zip(["must", "should", "should_not"], [self.must, self.should, self.should_not]):
+        for name, values in zip(['must', 'should', 'should_not'], [self.must, self.should, self.should_not]):
             if not values:
                 continue
 
             for field_name, field_values in values.items():
 
-            # field_name = "text", field_values = ["san francisco", "bay area"]
-                query[name].extend([v.expand_query() if isinstance(v, Query) else {"match" : {field_name : v}} for v in field_values])
+            # field_name = 'text', field_values = ['san francisco', 'bay area']
+                query[name].extend([v.expand_query() if isinstance(v, Query) else {'match' : {field_name : v}} for v in field_values])
 
-        return {"bool" : dict(query) }
+        return {'bool' : dict(query) }
 
 
     def to_elasticsearch(self):
-        return   { "query" : self.expand_query() }
+        return   { 'query' : self.expand_query() }
 {% endhighlight %}
 
-Let"s test it:
+Let's test it:
 
 {% highlight python %}
-inner = Query(must={"text" : ["san francisco", "bay area"]})
-query_outer = Query(should={"query" : inner, "title" : "hiring"})
+inner = Query(must={'text' : ['san francisco', 'bay area']})
+query_outer = Query(should={'query' : inner, 'title' : 'hiring'})
 query_outer.to_elasticsearch()
 >>> {
-        "query": {
-            "bool": {
-                "should": [
-                    {"match": {"title": "hiring"}},
-                    {"bool": {
-                        "must": [
-                            {"match": {"text": "san francisco"}},
-                            {"match": {"text": "bay area"}}
+        'query': {
+            'bool': {
+                'should': [
+                    {'match': {'title': 'hiring'}},
+                    {'bool': {
+                        'must': [
+                            {'match': {'text': 'san francisco'}},
+                            {'match': {'text': 'bay area'}}
                         ]
                     }}
                 ]
