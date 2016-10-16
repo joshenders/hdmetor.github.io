@@ -113,7 +113,7 @@ def format_data_for_action(post_id):
     '_source': fetch_hn_data(post_id)
 }
 
-actions = [format_data_for_action(r) for r in data['kids']]
+actions = [format_data_for_action(r) for r in data['kids'] if format_data_for_action(r)]
 list(parallel_bulk(es, actions))
 {% endhighlight %}
 
@@ -170,9 +170,9 @@ While this simple method works, it is still too manual to be really useful. Foe 
 
  In the next posts we are going to address the following issues:
 
-- easily combining elasticsearch queries
+- [easily combining elasticsearch queries]({% post_url 2016-10-10-how-to-combine-queries-in-es %})
 
-- updating the index (without reindexing everything from scratch every time)
+- [updating the index]({% post_url 2016-10-15-updating-the-index %}) (without reindexing everything from scratch every time)
 
 - being notified (via email, slack or similar) when an new post become available
 
