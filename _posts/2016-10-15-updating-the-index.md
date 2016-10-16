@@ -146,7 +146,7 @@ def find_hiring_thread():
     last_three_posts = sorted(all_posts)[-3:]
     for post in last_three_posts:
         data = fetch_hn_data(post)
-        if 'is hiring?' in fetch_hn_data(post)['text']:
+        if 'is hiring?' in fetch_hn_data(post)['title']:
             break
     return post
 
