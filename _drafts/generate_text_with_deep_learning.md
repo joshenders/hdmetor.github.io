@@ -127,60 +127,29 @@ So the smaller the step size, the more sequences we will obtain. Because of memo
 
 ## Preprocessing the text
 
-For each of the posting, we want to prepend the 'start_char' and append the `stop_char` tokens. Then, for each of the characters in the text, we want to replace it with its index if (remember that all the `bad_chars` will default to the same index)
+For each of the posting, we want to prepend the 'start_char' and append the `end_char` tokens to it. Then, for each of the characters in the text, we want to replace it with its index. Remember that all the `bad_chars` will default to the same index.
 
 ```python
 seq_len = 100
 step  = 3
 
 def process(doc):
-    doc = "<" + doc.lower() + ">"
-    return [[to_int_func(z) for z in doc[i:i+seq_len+1]] for i in range(0, len(doc) - seq_len, step)]
+    doc = start_char + doc.lower() + end_char
+    return [
+        [to_int_func(z) for z in doc[i:i + seq_len + 1]]
+        for i in range(0, len(doc) - seq_len, step)
+    ]
 
 def to_int_func(char):
-    #print("CHAT ", char, char in good_chars)
+    # checking if it's a good or bad char
     if char not in char_to_int:
         char = unknown_char
-        #print(char,  'returning')
     return char_to_int[char]
-
-
-
-
 ```
 
-Let us think how we are going to feed the text to the network. We need a 3 dimensional tensor, with shape `(num_timestamps, seq_len, num_chars)`.
-`seq_len` is just an arbitary number, 100 in this case.
-The number of timestamps, is determined by the lenght of the text and the step size. Let's start with an easy example:
+Also note that `process` returns a list of list, where each piece of text has length `seq_len + 1`, one more than expected. This is due to the fact, that we need positive example to train the network (we are doing supervised learning after all). Therefore, we are going to pick all but the last element as the input, and the last one as the desired output. In that way we can just slice a `numpy.array` which is always a very elegant way of doing it.
 
-
-```python
-text_example = 'In another moment down went Alice after'.lower()
-seq_len_example = 30
-step_example = 3
-divided = []
-for i in range(0, len(text_example) - seq_len_example, step_example):
-    divided.append(text_example[i : i + seq_len_example + 1])
-divided
-```
-
-
-
-
-    ['in another moment down went ali',
-     'another moment down went alice ',
-     'ther moment down went alice aft']
-
-
-
-Each row correspond to different timestamp, that we are going to transoform into a 2 dimentinal object via a one-hot encoding.
-
-The last piece that we need to remember is that this is supervised learning, which means we need to provide with positive examples for the network. We are creating sequences of lenght `seq_len + 1` to take the last elements of each for the expected values.
-
-Time to prepare the text for the training. For each example, we need to append a start and stop char, map the correposnding char to its index, and concatenate all the results.
-
-
-This is the case where I wish there was a `flatmap` function by default in Python. Since there is not, we are going to borrow [this](http://stackoverflow.com/a/20037408) implementation from StackOverflow
+At this point we need to concatenate the output of the `process` function when mapped to the list of postings. A `flatmap` function is what we need. Unfortunately it's not in the standard library so, we are going to borrow [this](http://stackoverflow.com/a/20037408) implementation from StackOverflow
 
 
 ```python
@@ -189,7 +158,7 @@ def flatmap(func, *iterable):
     return itertools.chain.from_iterable(map(func, *iterable))
 ```
 
-Now we are ready to process the text:
+We can finally process the text:
 
 
 ```python
@@ -199,14 +168,10 @@ transofmed = np.array(list(flatmap(process, all_listings)))
 transofmed.shape
 ```
 
-
-
-
     (5926775, 101)
 
 
-
-Each line now contains a sequence of length 101. Remember that the first 100 elements represent the feature vector, while the last one is the lable. Since we have used `np.array` is now very easy to separate them.
+Each line contains a sequence of length 101. Remember that the first 100 elements represent the feature vector, while the last one is the desired output. Since we have used `np.array` is now very easy to separate them.
 
 
 ```python
@@ -214,7 +179,9 @@ x_ = transofmed[:, :seq_len]
 y_ = transofmed[:, seq_len]
 ```
 
-Remember that each line of `x_` contains the indexes of the characters contained in the sequence. We want to transfor it using one hot econding:
+Again, each line of `x_` contains the indexes of the characters contained in the sequence, and `y_` the corresponding output.
+
+Since we need a 3 dimensional tensor, we need to transform that via a one hot encoding:
 
 
 ```python
