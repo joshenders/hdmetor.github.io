@@ -9,55 +9,61 @@ image:
   credit: dargadgetz
   creditlink: http://www.dargadgetz.com/ios-7-abstract-wallpaper-pack-for-iphone-5-and-ipod-touch-retina/
 ---
-In this blog, we are going to show how to train a charachter level deep learning model to generate fake jobs posting. We are going to train on all the Hacker News data we gather previously.
+In this blog, we are going to show how to train a charachter-level deep learning model to hallucinate new jobs posting.
 
-In order to do that, we will do a match query all query (using the `scan` helper function) and grab the text field from the source.
+In order to train the model, we need data from the previous Hacker news posting. In order to do that, we will do a match query all query and grab the text field from the source.
 
 
 ```python
 from elasticsearch import Elasticsearch
-es = Elasticsearch()
 from elasticsearch import helpers
+
+es = Elasticsearch()
 
 body= {
     "query" : {
         "match_all" : {}
     }
 }
-res = list(helpers.scan(es,  query=body))
 
+res = list(helpers.scan(es,  query=body))
 all_listings = [d['_source']['text'] for d in res if 'text' in d['_source']]
 
 ```
 
-Note that we used `scan` because of the potentially large output.
+Note that we used the helper function `scan` (rather than `es.search`) because of the potentially large output.
 
 ## Organizing the text and counting the characters
 
-Since we want to train a character level network, we need create a mapping from character to integers. Training the network on all the character will be way too wasteful (if possible at all), and very noisy at the end. Therefor we are going to select a subset of `good_chars` (the ones that will actually go into the model). All the other chars will be replaced with a special `unknown_char` token.
+Since we want to train a character level network, we need create a mapping from character to integers. Training the network on _all_ the character will be way too wasteful (if possible at all), and produce very noisy results. Therefore we are going to perform the following steps:
 
+- use only one type of apostrophe
+
+- lowercase all the text
+
+- define a subset of `bad_chars` which will contain the least used characters (note that the threshold for that was selected manually after printing `counter.most_common()`)
+
+- define the `good_chars` (the ones that will actually go into the model) as the complementary set to `bad_chars`
+
+- pick a special `start_char`, `end_char` and `unknown_char` after making sure they don't belong in the `good_char` set
+
+The reason why we need such special character is that we want to be able to generate a full listing, so we need to teach the model when a listing starts and ends.
 
 ```python
 from collections import Counter
 
 joined_listing = "".join(all_listings)
+counter = Counter(joined_listing.lower().replace("\"", "'").replace("’", "'"))
 chars = set(joined_listing)
-counter = Counter(joined_listing.lower())
 
-bad_chars = [c for c, v in Counter(joined_listing.lower()).most_common() if v < 1000]
+bad_chars = [c for c, v in counter.most_common() if v < 2000] + ['—', '•']
 good_chars = list(set(counter) - set(bad_chars))
 
-assert len(good_chars) + len(bad_chars) == len(counter)
-```
-
-Finally since we want to generate a full listing, we need to tell the network when a listing starts and when it ends. For that purpuse we are going to add a `start_char` and `end_char` token for each posting we have.
-
-
-```python
 start_char = '\x02'
 end_char = '\x03'
 unknown_char = '\x04'
 
+# we don't want to pick characters that are already used
 assert start_char not in good_chars
 assert end_char not in good_chars
 assert unknown_char not in good_chars
@@ -65,19 +71,71 @@ assert unknown_char not in good_chars
 good_chars.extend([start_token, end_token, unknown_char])
 ```
 
-
-Time to actually create the mapping between the charachter we are interested in (the `good_chars`, i.e. the most common chars plus the special tokens) and the integers.
+We can now create the mapping from character to index (and vice versa, which will be useful at text generation time).
 
 
 ```python
 char_to_int = {ch: i for i, ch in enumerate(good_chars)}
 int_to_char = {i: ch for i, ch in enumerate(good_chars)}
 ```
+# Tensorizing the text
 
+It is now time to transform a list of strings (i.e. a list that where each element is a different posting) to a 3 dimensional tensor.
+
+We know that the input has to have shape `(num_timestamps, seq_len, num_chars)`, where `seq_len` is an arbitrary number. It does represent the length of the sequence learn by the model.
+
+## Step size
+
+The number of timestamps (i.e. number of different training sequences) depends on the length of the text and the step we decide to use.
+
+Let us consider an example:
+
+```python
+text_example = 'in another moment down went Alice after'.lower()
+seq_len = 30
+step = 2
+divided = []
+for i in range(0, len(text_example) - seq_len, step):
+    divided.append(text_example[i : i + seq_len + 1])
+divided
+```
+
+    ['in another moment down went ali',
+     ' another moment down went alice',
+     'nother moment down went alice a',
+     'ther moment down went alice aft',
+     'er moment down went alice after']
+
+
+
+
+If we now change the step size, we will obtain a different number of sequences:
+
+```python
+step = 3
+divided = []
+for i in range(0, len(text_example) - seq_len, step_example):
+    divided.append(text_example[i : i + seq_len + 1])
+divided
+```
+
+    ['in another moment down went ali',
+     'another moment down went alice ',
+     'ther moment down went alice aft']
+
+So the smaller the step size, the more sequences we will obtain. Because of memory and time constrains, we are going to use a step size of 3.
+
+## Preprocessing the text
+
+For each of the posting, we want to prepend the 'start_char' and append the `stop_char` tokens. Then, for each of the characters in the text, we want to replace it with its index if (remember that all the `bad_chars` will default to the same index)
 
 ```python
 seq_len = 100
 step  = 3
+
+def process(doc):
+    doc = "<" + doc.lower() + ">"
+    return [[to_int_func(z) for z in doc[i:i+seq_len+1]] for i in range(0, len(doc) - seq_len, step)]
 
 def to_int_func(char):
     #print("CHAT ", char, char in good_chars)
@@ -87,10 +145,7 @@ def to_int_func(char):
     return char_to_int[char]
 
 
-def process(doc):
-    #print('DIC', doc)
-    doc = "<" + doc.lower() + ">"
-    return [[to_int_func(z) for z in doc[i:i+seq_len+1]] for i in range(0, len(doc) - seq_len, step)]
+
 
 ```
 
