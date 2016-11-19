@@ -8,4 +8,4 @@ Gemfile.lock
 .sass-cache
 .jekyll-metadata
 *.ipynb
-_drafts
+
