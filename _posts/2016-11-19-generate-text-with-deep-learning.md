@@ -228,7 +228,6 @@ Let's start training and save and save the model each epoch:
 
 
 ```python
-
 epochs = 100
 batch_size = 128
 for epoch in epochs:
