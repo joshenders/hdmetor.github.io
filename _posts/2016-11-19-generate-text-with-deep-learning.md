@@ -224,21 +224,17 @@ This is the beauty of Keras, we used only 8 lines to build our model in a Lego l
 
 The model we used here is 2 layers of LSTM with dropout (with probability 0.4 each). The last layer is a dense layer of dimension `len(good_char)`, one for each character (if you remember we used a the same character for a bunch of noisy elements). Note that we didn't use any embedding layer, because we did the vectorizing manually.
 
-Before starting the training we are going to use the `callback` module that will save for us the model at each iteration, if there was an improvement in training:
-
+Let's start training and save and save the model each epoch:
 
 
 ```python
-from keras.callbacks import ModelCheckpoint
 
-checkpointer = ModelCheckpoint(
-    filepath="weights.hdf5",
-    verbose=1,
-    save_best_only=True
-)
 epochs = 100
 batch_size = 128
-model.fit(X, Y, batch_size=batch_size, nb_epoch=epochs,  callbacks=[checkpointer])
+for epoch in epochs:
+  model.fit(X, Y, batch_size=batch_size, nb_epoch=1)
+  file_name = '{}.hdf5'.format(epoch)
+  model.save(file_name)
 ```
 
 Time to wait for the model to be trained. Please come back later for a new blog with some (hopefully interesting) examples of hallucinated job posting.
