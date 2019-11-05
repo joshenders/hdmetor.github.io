@@ -62,20 +62,24 @@ The resulting query will be something like this:
 {
     'query': {
         'bool': {
-            'must': [{
+            'must': [
+              {
                 'bool': {
                     'should': [
                         {'match': {'text': 'san francisco'}},
                         {'match': {'text': 'bay area'}}
                     ]
                 },
+              },
+              {
                 'bool': {
                     'should': [
                         {'match': {'text': 'machine learning'}},
                         {'match': {'text': 'data analysis'}}
                     ]
                 }
-            }]
+              }
+            ]
         }
     }
 }
