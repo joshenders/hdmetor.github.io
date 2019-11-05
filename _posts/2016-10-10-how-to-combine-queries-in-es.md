@@ -62,7 +62,7 @@ The resulting query will be something like this:
 {
     'query': {
         'bool': {
-            'must': [
+            'must': [{
                 'bool': {
                     'should': [
                         {'match': {'text': 'san francisco'}},
@@ -75,7 +75,7 @@ The resulting query will be something like this:
                         {'match': {'text': 'data analysis'}}
                     ]
                 }
-            ]
+            }]
         }
     }
 }
